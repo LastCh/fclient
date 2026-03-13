@@ -18,7 +18,7 @@ import org.apache.commons.codec.binary.Hex;
 
 import ru.iu3.fclient.databinding.ActivityMainBinding;
 
-public class MainActivity extends AppCompatActivity {
+public class MainActivity extends AppCompatActivity implements TransactionEvents {
 
     // Used to load the 'fclient' library on application startup.
     static {
@@ -28,7 +28,8 @@ public class MainActivity extends AppCompatActivity {
     }
 
     private ActivityMainBinding binding;
-    private ActivityResultLauncher activityResultLauncher;
+    private ActivityResultLauncher<Intent> activityResultLauncher;
+    private String pin;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -36,6 +37,7 @@ public class MainActivity extends AppCompatActivity {
 
         binding = ActivityMainBinding.inflate(getLayoutInflater());
         setContentView(binding.getRoot());
+
         initRng();
 
         activityResultLauncher = registerForActivityResult(
@@ -45,26 +47,21 @@ public class MainActivity extends AppCompatActivity {
                     public void onActivityResult(ActivityResult result) {
                         if (result.getResultCode() == Activity.RESULT_OK) {
                             Intent data = result.getData();
-                            String pin = data.getStringExtra("pin");
-                            Toast.makeText(MainActivity.this, pin, Toast.LENGTH_SHORT).show();
+                            pin = data.getStringExtra("pin");
+                            synchronized (MainActivity.this) {
+                                MainActivity.this.notifyAll();
+                            }
                         }
                     }
                 }
         );
+    }
 
-        // Lab1
-        /*
-        TextView tv = binding.sampleText;
-        initRng();
-
-        byte[] keyRand1 = randomBytes(16);
-        byte[] dataRand1 = randomBytes(16);
-        byte[] dataRandEnc1 = encrypt(keyRand1, dataRand1);
-        byte[] dataRandDenc1 = decrypt(keyRand1, dataRandEnc1);
-        tv.setText(Arrays.toString(keyRand1) + Arrays.toString(dataRand1) +
-                Arrays.toString(dataRandEnc1) + Arrays.toString(dataRandDenc1));
-
-         */
+    @Override
+    public void transactionResult(boolean result) {
+        runOnUiThread(()-> {
+            Toast.makeText(MainActivity.this, result ? "ok" : "failed", Toast.LENGTH_SHORT).show();
+        });
     }
 
     public static byte[] stringToHex(String s)
@@ -81,29 +78,33 @@ public class MainActivity extends AppCompatActivity {
         return hex;
     }
 
-    public void onButtonClick(View v)
-    {
-        // Lab2-Start
-        /*
-        byte[] key = stringToHex("0123456789ABCDEF0123456789ABCDE0");
-        byte[] enc = encrypt(key, stringToHex("000000000000000102"));
-        byte[] dec = decrypt(key, enc);
-        String s = new String(Hex.encodeHex(dec)).toUpperCase();
-        Toast.makeText(this, s, Toast.LENGTH_SHORT).show();
-         */
+    public void onButtonClick(View v) {
+        byte[] trd = stringToHex("9F0206000000000100");
+        transaction(trd);
+    }
 
-        Intent it = new Intent(this, PinpadActivity.class);
-        //startActivity(it);
-        activityResultLauncher.launch(it);
+    @Override
+    public String enterPin(int ptc, String amount) {
+        pin = new String();
+        Intent it = new Intent(MainActivity.this, PinpadActivity.class);
+        it.putExtra("ptc", ptc);
+        it.putExtra("amount", amount);
+        synchronized (MainActivity.this) {
+            activityResultLauncher.launch(it);
+            try {
+                MainActivity.this.wait();
+            } catch (Exception ex) {
+                LOGErrFromJNI();
+            }
+        }
+        return pin;
     }
 
 
-    /**
-     * A native method that is implemented by the 'fclient' native library,
-     * which is packaged with this application.
-     */
     public native String stringFromJNI();
+    public native boolean transaction(byte[] trd);
     public static native void LOGFromJNI();
+    public static native void LOGErrFromJNI();
     public static native int initRng();
     public static native byte[] randomBytes(int no);
     public static native byte[] encrypt(byte[] key, byte[] data);
