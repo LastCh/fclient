@@ -1,12 +1,20 @@
 package ru.iu3.fclient;
 
+import androidx.activity.result.ActivityResult;
+import androidx.activity.result.ActivityResultCallback;
+import androidx.activity.result.ActivityResultLauncher;
+import androidx.activity.result.contract.ActivityResultContracts;
 import androidx.appcompat.app.AppCompatActivity;
 
+import android.app.Activity;
+import android.content.Intent;
 import android.os.Bundle;
-import android.widget.TextView;
+import android.view.View;
+import android.widget.Toast;
 
-import java.util.ArrayList;
-import java.util.Arrays;
+import org.apache.commons.codec.DecoderException;
+import org.apache.commons.codec.binary.Hex;
+
 
 import ru.iu3.fclient.databinding.ActivityMainBinding;
 
@@ -20,16 +28,32 @@ public class MainActivity extends AppCompatActivity {
     }
 
     private ActivityMainBinding binding;
+    private ActivityResultLauncher activityResultLauncher;
 
     @Override
-
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
 
         binding = ActivityMainBinding.inflate(getLayoutInflater());
         setContentView(binding.getRoot());
+        initRng();
 
-        // Example of a call to a native method
+        activityResultLauncher = registerForActivityResult(
+                new ActivityResultContracts.StartActivityForResult(),
+                new ActivityResultCallback<ActivityResult>() {
+                    @Override
+                    public void onActivityResult(ActivityResult result) {
+                        if (result.getResultCode() == Activity.RESULT_OK) {
+                            Intent data = result.getData();
+                            String pin = data.getStringExtra("pin");
+                            Toast.makeText(MainActivity.this, pin, Toast.LENGTH_SHORT).show();
+                        }
+                    }
+                }
+        );
+
+        // Lab1
+        /*
         TextView tv = binding.sampleText;
         initRng();
 
@@ -39,7 +63,40 @@ public class MainActivity extends AppCompatActivity {
         byte[] dataRandDenc1 = decrypt(keyRand1, dataRandEnc1);
         tv.setText(Arrays.toString(keyRand1) + Arrays.toString(dataRand1) +
                 Arrays.toString(dataRandEnc1) + Arrays.toString(dataRandDenc1));
+
+         */
     }
+
+    public static byte[] stringToHex(String s)
+    {
+        byte[] hex;
+        try
+        {
+            hex = Hex.decodeHex(s.toCharArray());
+        }
+        catch (DecoderException ex)
+        {
+            hex = null;
+        }
+        return hex;
+    }
+
+    public void onButtonClick(View v)
+    {
+        // Lab2-Start
+        /*
+        byte[] key = stringToHex("0123456789ABCDEF0123456789ABCDE0");
+        byte[] enc = encrypt(key, stringToHex("000000000000000102"));
+        byte[] dec = decrypt(key, enc);
+        String s = new String(Hex.encodeHex(dec)).toUpperCase();
+        Toast.makeText(this, s, Toast.LENGTH_SHORT).show();
+         */
+
+        Intent it = new Intent(this, PinpadActivity.class);
+        //startActivity(it);
+        activityResultLauncher.launch(it);
+    }
+
 
     /**
      * A native method that is implemented by the 'fclient' native library,
